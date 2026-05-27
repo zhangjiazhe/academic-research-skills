@@ -4,308 +4,317 @@
 
 Original upstream repository: [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills)
 
-This repository stores four Codex skills under the `skills/` directory:
-
-- `deep-research`
-- `academic-paper-reviewer`
-- `my-academic-paper`
-- `my-academic-pipeline`
-
----
+This repository stores a customized Codex academic research and writing workflow under `skills/`.
 
 ## 中文说明
 
 ### 仓库说明
 
-这个仓库用于保存一套面向学术研究与论文写作的 Codex skills。  
-其中：
+这是一个面向学术研究、论文写作、文献真实性控制、审稿、修稿和最终定稿的 Codex skills 仓库。
 
-- `deep-research`：负责研究、文献检索、事实核查与综述
-- `academic-paper-reviewer`：负责审稿与复审
-- `my-academic-paper`：负责按自定义规则写论文
-- `my-academic-pipeline`：负责把研究、写作、审稿、修稿串成完整流程
+当前推荐主入口是：
 
-其中 `my-academic-paper` 和 `my-academic-pipeline` 是在原版能力基础上做的定制化版本；`deep-research` 和 `academic-paper-reviewer` 目前保留原版主体能力，用作这套流程中的研究与审稿模块。
+- `academic-research-workflow`
 
----
+它替代旧版：
+
+- `my-academic-pipeline`
+
+其他 skills 保持原名，作为子 skill 被 `academic-research-workflow` 调度：
+
+- `deep-research`
+- `my-academic-paper`
+- `academic-paper-reviewer`
+- `nature-academic-search`
+- 其他 `nature-*` skills
 
 ### 目录结构
 
 ```text
 skills/
+├── academic-research-workflow/   # 新版主工作流入口
 ├── academic-paper-reviewer/
 ├── deep-research/
 ├── my-academic-paper/
-└── my-academic-pipeline/
+├── nature-academic-search/       # 结构化文献检索核心依赖
+└── my-academic-pipeline/         # legacy，保留兼容
 ```
 
----
+### 安装方法
 
-### 1. deep-research
+将需要的 skill 复制到本机 Codex skills 目录：
 
-#### 功能
+```bash
+mkdir -p ~/.codex/skills
+cp -R skills/academic-research-workflow ~/.codex/skills/
+cp -R skills/deep-research ~/.codex/skills/
+cp -R skills/my-academic-paper ~/.codex/skills/
+cp -R skills/academic-paper-reviewer ~/.codex/skills/
+cp -R skills/nature-academic-search ~/.codex/skills/
+```
 
-`deep-research` 是研究入口 skill，主要用于：
+如果需要其他 Nature 系列辅助 skills，可另外安装对应扩展；本仓库至少包含新版 workflow 必需的 `nature-academic-search`。
 
-- 研究选题澄清
-- 研究问题设计
-- 文献检索与筛选
-- 文献综述与系统性回顾
-- 事实核查
-- 方法设计
-- 研究报告输出
+### 新版主入口：academic-research-workflow
 
-它更像“研究助理团队”，而不是论文写作器。
+`academic-research-workflow` 是新版顶层论文工作流控制器。它不直接写论文，而是负责：
 
-#### 怎么使用
+- 初始化 run 文件夹
+- 创建 `manifest.yaml`
+- 创建/编译 `workflow.yaml`
+- 创建 `agent_tasks/*.yaml`
+- 调度子 skills
+- 强制 hard gate
+- 维护状态和日志
+- 在 Codex 支持 subagents 时强制使用真实多 agent
 
-适合在你还没有成稿、还在找方向或补文献时使用。常见输入方式：
+#### 两级启动方式
+
+规划/初始化模式：
 
 ```text
-Research the impact of AI on higher education quality assurance
+启动 academic-research-workflow
 ```
+
+严格全自动多 agent 模式：
 
 ```text
-Guide my research on building facade semantic segmentation
+启动 academic-research-workflow 全自动多agent工作流
 ```
 
-```text
-帮我做建筑立面语义分割的文献综述
-```
+规划模式会创建 run folder，并停在必要的 intake/design gate。  
+全自动多 agent 模式会在 proposal 被确认并编译后，按 task graph 自动执行。
 
-#### 在这套仓库里的定位
+#### 支持的论文类型
 
-在这套定制工作流里，`deep-research` 还承担一个额外职责：
-
-- 当 `my-academic-paper` 需要“寻找参考文献、补充参考文献、核查参考文献真实性”时，会把检索任务上交给 `deep-research`
-
-也就是说：
-
-- `deep-research` 负责找文献、验文献
-- `my-academic-paper` 负责把文献放进论文里
-
-#### 相对原版做了什么修改
-
-- 当前仓库中保留的是原版主体能力
-- 没有重写其内部研究逻辑
-- 主要修改发生在与 `my-academic-paper` / `my-academic-pipeline` 的协同调用关系上
-
----
-
-### 2. academic-paper-reviewer
-
-#### 功能
-
-`academic-paper-reviewer` 是审稿 skill，主要用于：
-
-- 投稿前模拟审稿
-- 方法部分专项检查
-- 修稿后的复审
-- 给出结构化修改建议
-- 生成编辑意见与 revision roadmap
-
-它会模拟多位不同视角的审稿人，而不是只给单一评价。
-
-#### 怎么使用
-
-当你已经有初稿或修订稿时使用。常见输入方式：
-
-```text
-Review this paper
-```
-
-```text
-Help me check the methodology of this paper
-```
-
-```text
-Re-review this revised manuscript
-```
-
-#### 在这套仓库里的定位
-
-在这套仓库中，它是固定的审稿模块，通常由以下两种方式触发：
-
-- 单独调用，直接审稿
-- 由 `my-academic-pipeline` 在 REVIEW / RE-REVIEW 阶段调用
-
-#### 相对原版做了什么修改
-
-- 当前仓库中保留的是原版主体能力
-- 没有重写其核心审稿结构
-- 它主要作为定制工作流中的标准审稿器使用
-
----
-
-### 3. my-academic-paper
-
-#### 功能
-
-`my-academic-paper` 是本仓库最核心的定制写作 skill。  
-它负责根据用户明确声明的论文类型，按不同路线组织写作。
-
-当前支持 3 条路线：
+初始论文路线必须由用户明确选择：
 
 - `毕业论文`
 - `工科学术论文`
 - `计算机会议论文`
 
-#### 怎么使用
+workflow 不会静默推断论文类型。
 
-使用时必须先明确说出论文类型，skill 不能自行判断。  
-推荐输入方式：
+#### 默认设置
 
-```text
-这是工科学术论文。我的研究是……请先帮我整理框架
-```
+- 目标标准：按可行的最高标准写
+- 目标语言：中文
+- 输出格式：TeX，然后编译 PDF
+- run 文件夹：当前论文目录下的 `runs/<date_topic>/`
+- 状态文件：`manifest.yaml`
+- 正式任务图：`workflow.yaml`
+- agent 任务单：`agent_tasks/*.yaml`
+- 产物目录：`artifacts/`
+- 日志目录：`logs/`
 
-```text
-这是毕业论文。我的题目是……
-```
+### 工作流核心机制
 
-然后它会按固定流程工作：
+#### 1. Manifest 驱动
 
-1. 读取材料
-2. 复述你的工作
-3. 给出整体写作框架
-4. 等你确认
-5. 只有你明确说 `开始写作`，才进入正文写作
-
-#### 工科学术论文路线的特点
-
-内部写作顺序固定为：
-
-1. Method
-2. Results
-3. Discussion
-4. Conclusion
-5. Future Work
-6. Introduction
-
-但最终成稿顺序会自动整理成正规论文排布：
-
-1. Introduction
-2. Method
-3. Results
-4. Discussion
-5. Conclusion
-6. Future Work
-
-并且已经加入了你定制的规则，包括：
-
-- Method 要批判其他方法局限
-- 参数、尺度、权重要有依据
-- Results 必须定量 + 定性，且每个结果都要分析
-- Discussion 不能引入新结果
-- Conclusion 使用固定结论模板
-- Future Work 要先写研究不足，再接展望
-- Introduction 的背景段要落回本研究，并遵守引用规则
-
-#### 毕业论文路线的特点
-
-毕业论文路线采用“按章写作”的方式：
-
-- 每章包含：`章前言`、`正文`、`章小结`
-- 实际写作顺序是：`正文 -> 章小结 -> 章前言`
-- 正文内部由多个小节组成
-- 每个小节遵循：`节前言 -> 方法 -> 结果 -> 讨论`
-- 所有常规章写完后，再写结论章，最后写引言
-
-#### 相对原版做了什么修改
-
-`my-academic-paper` 是在原版 `academic-paper` 基础上定制出来的，主要修改包括：
-
-- 删除“自动推断论文类型”的空间，改为必须由用户明确声明：
-  - `毕业论文`
-  - `工科学术论文`
-  - `计算机会议论文`
-- 增加“写作前审批门”：
-  - 先复述工作
-  - 先给框架
-  - 必须等待 `开始写作`
-- 将工科学术论文与毕业论文的规则拆成独立目录维护：
-  - `references/engineering-paper/`
-  - `references/graduate-thesis/`
-- 增加了针对标题、参考文献、排版、图表、公式、引用位置、用词的全局约束
-- 明确把参考文献检索任务交给 `deep-research`
-
----
-
-### 4. my-academic-pipeline
-
-#### 功能
-
-`my-academic-pipeline` 是整套流程的总调度 skill。  
-它负责把研究、写作、审稿、修稿、复审、定稿串起来。
-
-核心流程如下：
-
-1. Research
-2. Write
-3. Integrity Check
-4. Review
-5. Revise
-6. Re-review
-7. Re-revise
-8. Final Integrity Check
-9. Finalize
-
-#### 怎么使用
-
-适合你想从研究一直走到成稿，而不想手动切换 skill 时使用。常见输入方式：
+每次运行都会创建：
 
 ```text
-I want a full academic pipeline for my topic
+runs/<date_topic>/
+├── manifest.yaml
+├── workflow.yaml
+├── workflow_proposal.yaml
+├── agent_tasks/
+├── artifacts/
+└── logs/
 ```
+
+`manifest.yaml` 是唯一权威状态记录。对话上下文不是权威状态。
+
+#### 2. Model-Planned Task Graph
+
+完整任务图不是由 JS 写死，而是：
 
 ```text
-Help me go from research to paper
+模型生成 workflow_proposal.yaml
+        ↓
+用户完整审阅和修改
+        ↓
+JS 校验并编译
+        ↓
+workflow.yaml + agent_tasks/*.yaml
 ```
+
+proposal 展示采用完整详细版，必须列出：
+
+- 全部阶段
+- 全部任务
+- agent 分配
+- skill 分配
+- 串行依赖
+- 并行任务组
+- 输入 artifacts
+- 输出 artifacts
+- hard gates
+- 每个 task 的 prompt
+- 每个 task 的 completion criteria
+
+#### 3. JS Runtime
+
+`academic-research-workflow/scripts/` 提供无外部依赖的 Node.js runtime：
 
 ```text
-我已经有初稿了，帮我继续后面的审稿和修稿流程
+scripts/
+├── init_run.js
+├── build_workflow.js
+├── validate_workflow_proposal.js
+├── compile_task_graph.js
+├── validate_manifest.js
+├── validate_workflow.js
+├── validate_task_card.js
+├── advance_stage.js
+└── lib/workflow_runtime.js
 ```
 
-#### 在这套仓库里的调用关系
+这些脚本负责机械流程：
 
-它本身不负责真正写内容，而是负责调度：
+- 初始化 run
+- 校验 manifest
+- 校验 proposal
+- 编译 task graph
+- 校验 workflow
+- 校验 task card
+- 推进状态
+- 记录 blocking gate
 
-- 研究阶段调用 `deep-research`
-- 写作阶段调用 `my-academic-paper`
-- 审稿阶段调用 `academic-paper-reviewer`
-- 修稿阶段再次调用 `my-academic-paper`
+模型负责规划，JS 负责校验和冻结。
 
-#### 相对原版做了什么修改
+#### 4. Hard Gate
 
-`my-academic-pipeline` 是在原版 `academic-pipeline` 基础上定制出来的，主要修改包括：
+workflow 只在关键 gate 停下：
 
-- 保留原有“研究 -> 写作 -> 审稿 -> 修稿”的总结构
-- 将原版写作阶段替换为 `my-academic-paper`
-- 因此整个 pipeline 会自动继承你的：
-  - 论文类型声明规则
-  - 框架先确认规则
-  - `开始写作` 启动规则
-  - 工科 / 毕业论文的专用写作规范
+- `ROUTE_GATE`
+- `TOPIC_CLAIM_GATE`
+- `FRAMEWORK_GATE`
+- `START_WRITING_GATE`
+- `INTEGRITY_GATE`
+- `REVIEWER_FEASIBILITY_GATE`
 
----
+普通阶段完成后不会每一步都等用户确认。
+
+#### 5. 多 agent 规则
+
+如果 Codex 当前环境提供原生 subagent 工具，workflow 必须真实调用：
+
+- `spawn_agent`
+- `wait_agent`
+- `close_agent`
+
+不能只在 prompt 中写“使用多 agent”。  
+如果环境没有 subagent，则按同一个 `workflow.yaml` 顺序执行 fallback，但仍保留 task card、hard gate、artifact 和 manifest 更新。
+
+#### 6. 文献真实性规则
+
+参考文献必须遵守 Verified Source Corpus 边界：
+
+- `nature-academic-search` 负责结构化检索和元数据查找
+- PubMed / CrossRef / arXiv / DOI lookup 等工具用于提高真实性
+- `deep-research` 负责筛选、综合和形成 `Verified Source Corpus`
+- 未验证文献只能进入 `Candidate Sources - Unverified`
+- 未验证文献不能进入正文、`.bib`、最终参考文献
+- 不允许从模型记忆补全或编造参考文献
+
+### 子 skills 定位
+
+#### deep-research
+
+研究与文献层：
+
+- 研究问题设计
+- 文献搜索策略
+- 文献筛选
+- source verification
+- evidence synthesis
+- `Verified Source Corpus`
+
+#### nature-academic-search
+
+结构化文献检索/元数据后端：
+
+- PubMed
+- CrossRef
+- arXiv
+- DOI lookup
+- citation export
+- BibTeX / RIS / NBIB 等参考文献管理
+
+#### my-academic-paper
+
+写作层：
+
+- 毕业论文
+- 工科学术论文
+- 计算机会议论文
+- 框架设计
+- TeX 草稿
+- 修稿
+- 最终 TeX/PDF
+
+#### academic-paper-reviewer
+
+审稿层：
+
+- 多 reviewer 模拟
+- Devil's Advocate
+- editorial decision
+- revision roadmap
+- re-review
+
+### 本次重要更新
+
+本次更新的重点是把旧版 `my-academic-pipeline` 升级为新的 `academic-research-workflow`：
+
+- 新增 `academic-research-workflow` skill
+- 明确它替代旧版 `my-academic-pipeline`
+- 加入 `manifest.yaml` 状态管理
+- 加入 `workflow.yaml` 正式任务图
+- 加入 `agent_tasks/*.yaml` 标准任务单
+- 加入 `workflow_proposal.yaml`
+- 引入“模型规划 → 用户审阅 → JS 编译冻结”的任务图流程
+- 新增 JS runtime
+- 新增 proposal authoring guide
+- 新增 proposal review checklist
+- 强化多 agent 调度规则
+- 强化文献真实性边界
+- 强化 hard gate 机制
+- 默认中文、TeX、PDF 输出
+- 最终 PDF 不再额外确认，final integrity PASS 后自动生成
 
 ### 推荐使用方式
 
-如果你只想补文献或查证：
+只查文献或做综述：
 
-- 用 `deep-research`
+```text
+使用 deep-research 做这个主题的文献综述
+```
 
-如果你已经准备开始写：
+只写论文：
 
-- 用 `my-academic-paper`
+```text
+这是工科学术论文，请使用 my-academic-paper 先设计框架
+```
 
-如果你已经有稿子，想审稿：
+审稿：
 
-- 用 `academic-paper-reviewer`
+```text
+使用 academic-paper-reviewer 审这篇论文
+```
 
-如果你想从研究一直走到投稿前完整闭环：
+完整流程：
 
-- 用 `my-academic-pipeline`
+```text
+启动 academic-research-workflow
+```
+
+完整流程并启用严格多 agent：
+
+```text
+启动 academic-research-workflow 全自动多agent工作流
+```
 
 ---
 
@@ -313,300 +322,125 @@ Help me go from research to paper
 
 ### Repository Overview
 
-This repository stores a Codex-based academic workflow composed of four skills:
+This repository provides customized Codex skills for academic research, writing, reference verification, review, revision, and finalization.
 
-- `deep-research`
-- `academic-paper-reviewer`
-- `my-academic-paper`
+The recommended top-level entry point is:
+
+- `academic-research-workflow`
+
+It replaces the legacy:
+
 - `my-academic-pipeline`
 
-Among them:
+Other skills remain as child skills:
 
-- `deep-research` handles literature search, research design, synthesis, and fact-checking
-- `academic-paper-reviewer` handles peer review and re-review
-- `my-academic-paper` is the customized writing skill
-- `my-academic-pipeline` is the end-to-end orchestrator
+- `deep-research`
+- `my-academic-paper`
+- `academic-paper-reviewer`
+- `nature-academic-search`
+- other `nature-*` skills
 
-`my-academic-paper` and `my-academic-pipeline` are customized derivatives of the upstream project. `deep-research` and `academic-paper-reviewer` are currently preserved as the original base modules and used as research/review components inside the customized workflow.
+### Installation
 
----
+Copy the required skills into your local Codex skills directory:
 
-### Directory Layout
-
-```text
-skills/
-├── academic-paper-reviewer/
-├── deep-research/
-├── my-academic-paper/
-└── my-academic-pipeline/
+```bash
+mkdir -p ~/.codex/skills
+cp -R skills/academic-research-workflow ~/.codex/skills/
+cp -R skills/deep-research ~/.codex/skills/
+cp -R skills/my-academic-paper ~/.codex/skills/
+cp -R skills/academic-paper-reviewer ~/.codex/skills/
+cp -R skills/nature-academic-search ~/.codex/skills/
 ```
 
----
+### academic-research-workflow
 
-### 1. deep-research
+`academic-research-workflow` is the new top-level workflow controller. It coordinates the full academic pipeline without doing substantive research or writing by itself.
 
-#### What it does
+It manages:
 
-`deep-research` is the research-entry skill. It is used for:
+- run folder initialization
+- `manifest.yaml`
+- `workflow_proposal.yaml`
+- `workflow.yaml`
+- `agent_tasks/*.yaml`
+- child skill dispatch
+- hard gates
+- logs and artifacts
+- true Codex subagent execution when available
 
-- topic clarification
-- research question formulation
-- literature search and screening
-- literature review and systematic review
-- fact-checking
-- methodology design
-- academic research report generation
+### Launch Commands
 
-It acts as a research assistant team rather than a paper drafting tool.
-
-#### How to use it
-
-Use it when you are still exploring the topic, building a literature base, or checking claims. Example prompts:
+Planning / initialization:
 
 ```text
-Research the impact of AI on higher education quality assurance
+启动 academic-research-workflow
 ```
+
+Strict fully automatic multi-agent workflow:
 
 ```text
-Guide my research on building facade semantic segmentation
+启动 academic-research-workflow 全自动多agent工作流
 ```
+
+### Core Design
+
+The full task graph is not hard-coded in JavaScript.
+
+Instead:
 
 ```text
-Help me build a literature review on facade parsing
+Model drafts workflow_proposal.yaml
+        ↓
+User reviews the complete detailed proposal
+        ↓
+JS validates and compiles it
+        ↓
+workflow.yaml + agent_tasks/*.yaml
 ```
 
-#### How it is used in this repository
+The user receives a complete detailed proposal, including stages, tasks, agents, skills, dependencies, parallel groups, inputs, outputs, hard gates, prompts, and completion criteria.
 
-Inside this customized workflow, `deep-research` also serves as the upstream reference-discovery layer:
+### JS Runtime
 
-- when `my-academic-paper` needs to search for references
-- when citations need to be expanded
-- when a citation needs to be verified as real
-
-So the division of labor is:
-
-- `deep-research` finds and verifies sources
-- `my-academic-paper` integrates those sources into the manuscript
-
-#### What was changed from the original
-
-- The core research logic is preserved from the upstream version
-- No major rewrite was applied to its internal workflow
-- The main change is how it is coordinated with `my-academic-paper` and `my-academic-pipeline`
-
----
-
-### 2. academic-paper-reviewer
-
-#### What it does
-
-`academic-paper-reviewer` is the review skill. It is used for:
-
-- pre-submission peer review
-- methodology-focused review
-- re-review after revision
-- structured editorial feedback
-- revision roadmap generation
-
-It simulates multiple reviewers with different perspectives instead of producing a single generic judgment.
-
-#### How to use it
-
-Use it when you already have a draft or a revised manuscript. Example prompts:
+The bundled no-dependency Node.js runtime includes:
 
 ```text
-Review this paper
+scripts/init_run.js
+scripts/build_workflow.js
+scripts/validate_workflow_proposal.js
+scripts/compile_task_graph.js
+scripts/validate_manifest.js
+scripts/validate_workflow.js
+scripts/validate_task_card.js
+scripts/advance_stage.js
+scripts/lib/workflow_runtime.js
 ```
 
-```text
-Help me check the methodology of this paper
-```
+The model plans. JS validates and freezes.
 
-```text
-Re-review this revised manuscript
-```
+### Reference Integrity
 
-#### How it is used in this repository
+References must pass the Verified Source Corpus boundary:
 
-In this repository, it is the fixed review module and is usually used in two ways:
+- structured discovery through `nature-academic-search`
+- metadata checks through PubMed / CrossRef / arXiv / DOI lookup
+- synthesis and filtering through `deep-research`
+- unverified sources remain in `Candidate Sources - Unverified`
+- unverified sources cannot enter manuscript citations, `.bib`, or final references
+- no reference may be completed from model memory
 
-- directly, as a standalone review tool
-- indirectly, when `my-academic-pipeline` reaches the REVIEW or RE-REVIEW stages
+### What Changed In This Update
 
-#### What was changed from the original
-
-- The core review structure is preserved from the upstream version
-- No major rewrite was applied to its main review logic
-- It mainly serves as the standard reviewer inside the customized workflow
-
----
-
-### 3. my-academic-paper
-
-#### What it does
-
-`my-academic-paper` is the central customized writing skill in this repository.  
-It organizes drafting according to a user-declared paper route.
-
-It currently supports three explicit routes:
-
-- `毕业论文`
-- `工科学术论文`
-- `计算机会议论文`
-
-#### How to use it
-
-You must explicitly state the paper type. The skill is not allowed to infer it automatically. Recommended examples:
-
-```text
-这是工科学术论文。我的研究是……请先帮我整理框架
-```
-
-```text
-这是毕业论文。我的题目是……
-```
-
-Then the workflow is:
-
-1. read the materials
-2. restate the user's work
-3. propose the overall writing framework
-4. wait for confirmation
-5. only begin drafting after the exact command `开始写作`
-
-#### Engineering-paper route
-
-Its internal drafting order is fixed as:
-
-1. Method
-2. Results
-3. Discussion
-4. Conclusion
-5. Future Work
-6. Introduction
-
-But the final assembled paper is reordered into standard presentation order:
-
-1. Introduction
-2. Method
-3. Results
-4. Discussion
-5. Conclusion
-6. Future Work
-
-This route already includes custom constraints such as:
-
-- Method must critique the limitations of alternative methods
-- parameters, scales, and weights must be justified
-- Results must be quantitative plus concise qualitative interpretation
-- every result must be analyzed
-- Discussion must not introduce new results
-- Conclusion follows a fixed engineering-paper summary structure
-- Future Work must start from limitations before moving to outlook
-- Introduction background paragraphs must connect back to the present study
-
-#### Graduate-thesis route
-
-The graduate-thesis route uses chapter-based writing:
-
-- each chapter contains `章前言`, `正文`, and `章小结`
-- actual writing order is `正文 -> 章小结 -> 章前言`
-- the body can contain multiple subsections
-- each subsection follows `节前言 -> Method -> Results -> Discussion`
-- after all regular chapters are done, the conclusion chapter is written, and the introduction is written last
-
-#### What was changed from the original
-
-`my-academic-paper` is a customized derivative of the original `academic-paper` skill. Major changes include:
-
-- removal of route inference; the user must explicitly declare:
-  - `毕业论文`
-  - `工科学术论文`
-  - `计算机会议论文`
-- addition of a pre-writing approval gate:
-  - restate the work first
-  - propose the framework first
-  - wait for `开始写作`
-- engineering-paper and graduate-thesis rules were split into maintainable directories:
-  - `references/engineering-paper/`
-  - `references/graduate-thesis/`
-- global constraints were added for title style, references, formatting, figures, formulas, citation placement, and wording
-- reference discovery was explicitly handed off to `deep-research`
-
----
-
-### 4. my-academic-pipeline
-
-#### What it does
-
-`my-academic-pipeline` is the top-level workflow orchestrator.  
-It connects research, writing, review, revision, re-review, and finalization.
-
-Its core flow is:
-
-1. Research
-2. Write
-3. Integrity Check
-4. Review
-5. Revise
-6. Re-review
-7. Re-revise
-8. Final Integrity Check
-9. Finalize
-
-#### How to use it
-
-Use it when you want the full research-to-paper workflow without manually switching skills. Example prompts:
-
-```text
-I want a full academic pipeline for my topic
-```
-
-```text
-Help me go from research to paper
-```
-
-```text
-I already have a draft. Help me continue with review and revision.
-```
-
-#### Internal dispatch logic
-
-This skill does not do the substantive research or writing itself. It dispatches other skills:
-
-- `deep-research` for the research stage
-- `my-academic-paper` for the writing stage
-- `academic-paper-reviewer` for the review stage
-- `my-academic-paper` again for revision and final writing stages
-
-#### What was changed from the original
-
-`my-academic-pipeline` is a customized derivative of the original `academic-pipeline`. Major changes include:
-
-- preserving the original high-level research -> write -> review -> revise structure
-- replacing the original writing stage with `my-academic-paper`
-- therefore inheriting all custom writing rules automatically, including:
-  - explicit route declaration
-  - framework-first approval
-  - `开始写作` as the drafting gate
-  - engineering-paper and graduate-thesis specific writing constraints
-
----
-
-### Recommended Usage
-
-If you only need literature search or fact-checking:
-
-- use `deep-research`
-
-If you are ready to draft a paper:
-
-- use `my-academic-paper`
-
-If you already have a draft and want review:
-
-- use `academic-paper-reviewer`
-
-If you want a full research-to-paper pipeline:
-
-- use `my-academic-pipeline`
+- Added `academic-research-workflow`
+- Added `nature-academic-search` as the structured literature-search dependency
+- Marked `my-academic-pipeline` as legacy
+- Added manifest-driven workflow state
+- Added proposal-driven task graph planning
+- Added JS runtime for validation and compilation
+- Added standardized task cards
+- Added hard gates
+- Added strict multi-agent invocation rules
+- Strengthened reference authenticity rules
+- Added full-detail proposal review workflow
+- Defaulted final output to TeX and compiled PDF
