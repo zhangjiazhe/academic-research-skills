@@ -857,6 +857,16 @@ Stage 5: my-academic-paper (format-convert mode)
 | Dependent Skills | deep-research v2.0+, my-academic-paper v1.0+, academic-paper-reviewer v1.1+ |
 | Role | Full academic research workflow orchestrator |
 
+## Latest Update Result
+
+Version `3.6.5` adds manifest-first continuation for long automatic runs.
+
+- `manifest.yaml` is now the canonical workflow state.
+- `scripts/next_action.js <run_dir>` resolves the next runnable task batch before every resume/status/continue decision.
+- Stale `workflow.yaml` or `agent_tasks/*.yaml` statuses must not stop the run when the manifest shows that work can continue.
+- Progress dashboards are informational only; they are not user-review gates.
+- Strict automatic runs continue whenever `auto_continue: true` and no active gate, blocking issue, paused, completed, or aborted state is recorded.
+
 ---
 
 ## Changelog

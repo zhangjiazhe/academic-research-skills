@@ -28,6 +28,31 @@ This repository stores a customized Codex academic research and writing workflow
 - `nature-academic-search`
 - 其他 `nature-*` skills
 
+### 当前最新更新结果
+
+版本：`academic-research-workflow` v3.6.5
+
+本次更新解决的是 workflow 在长流程中容易出现的两个问题：
+
+- 恢复/继续执行时，模型可能读取到旧的 task card 状态，误以为没有下一步任务。
+- 进度展示或阶段摘要可能被误当成需要用户审核的 gate，导致全自动流程停在不该停的位置。
+
+现在的执行规则改为：
+
+- `manifest.yaml` 是唯一权威状态文件。
+- `workflow.yaml` 和 `agent_tasks/*.yaml` 只定义任务图与任务单，不能覆盖 manifest 中的完成状态。
+- 每次 resume/status/continue 时必须先运行 `scripts/next_action.js <run_dir>`。
+- 如果没有 active gate、blocking issue、paused/completed/aborted 状态，并且 `auto_continue: true`，workflow 必须继续调度下一批 runnable tasks。
+- 只有真正的 blocking gates，例如 integrity check 失败或 reviewer 要求无法由现有材料解决的新实验，才允许暂停等待用户。
+
+新增脚本：
+
+```bash
+node ~/.codex/skills/academic-research-workflow/scripts/next_action.js <run_dir>
+```
+
+本次提交：`2bcedfc Add manifest-first workflow continuation`
+
 ### 目录结构
 
 ```text
@@ -341,6 +366,31 @@ Other skills remain as child skills:
 - `academic-paper-reviewer`
 - `nature-academic-search`
 - other `nature-*` skills
+
+### Latest Update Result
+
+Version: `academic-research-workflow` v3.6.5
+
+This update fixes two long-running workflow failure modes:
+
+- On resume/continue turns, the model could read stale task-card status and incorrectly conclude that there was no next task.
+- Progress summaries could be treated as implicit review gates, causing fully automatic runs to stop even when no user review was required.
+
+The workflow now follows these rules:
+
+- `manifest.yaml` is the single canonical state file.
+- `workflow.yaml` and `agent_tasks/*.yaml` define the task graph and task cards, but they do not override completed state in the manifest.
+- Every resume/status/continue turn must run `scripts/next_action.js <run_dir>` first.
+- If there is no active gate, blocking issue, paused/completed/aborted state, and `auto_continue: true`, the workflow must dispatch the next runnable task batch.
+- Only real blocking gates, such as failed integrity checks or reviewer requests requiring unavailable new experiments, may pause the automatic workflow.
+
+New script:
+
+```bash
+node ~/.codex/skills/academic-research-workflow/scripts/next_action.js <run_dir>
+```
+
+Commit: `2bcedfc Add manifest-first workflow continuation`
 
 ### Installation
 
