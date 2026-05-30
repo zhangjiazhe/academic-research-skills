@@ -2,8 +2,8 @@
 name: academic-research-workflow
 description: "Customized full academic research pipeline: research -> custom writing -> integrity check -> review -> revise -> re-review -> re-revise -> final integrity check -> finalize. Coordinates deep-research, my-academic-paper, and academic-paper-reviewer so the original workflow is preserved while the writing stages use the user's thesis/engineering/conference routing rules."
 metadata:
-  version: "3.6.4"
-  last_updated: "2026-04-25"
+  version: "3.6.5"
+  last_updated: "2026-05-29"
   depends_on: "deep-research, my-academic-paper, academic-paper-reviewer"
   status: active
   data_access_level: verified_only
@@ -14,7 +14,7 @@ metadata:
     - academic-paper-reviewer
 ---
 
-# Academic Research Workflow v3.6.4 — Customized Academic Research Workflow Orchestrator
+# Academic Research Workflow v3.6.5 — Customized Academic Research Workflow Orchestrator
 
 A lightweight orchestrator that manages the complete academic pipeline from research exploration to final manuscript. It does not perform substantive work — it only detects stages, recommends modes, dispatches skills, manages transitions, and tracks state.
 
@@ -72,6 +72,7 @@ For deterministic workflow operations, prefer the bundled JS runtime scripts ins
 | Validate manifest shape and run folder paths | `scripts/validate_manifest.js` |
 | Validate workflow graph shape | `scripts/validate_workflow.js` |
 | Validate one task card | `scripts/validate_task_card.js` |
+| Resolve the next runnable task(s) from manifest-first state | `scripts/next_action.js` |
 | Advance status, current stage, next action, or a blocking gate | `scripts/advance_stage.js` |
 
 The JS runtime is the guardrail for repeatable state operations. The Markdown instructions define policy; the scripts enforce the mechanical parts.
@@ -97,6 +98,17 @@ pipeline_run_id: "<date_topic_slug>"
 workflow_name: "academic-research-workflow"
 status: "planning"
 current_stage: "stage_0_intake"
+
+execution_control:
+  execution_mode: "planning"       # planning / strict_multi_agent / sequential_fallback
+  auto_continue: false             # true in strict_multi_agent unless explicitly paused
+  canonical_state_file: "manifest.yaml"
+  resume_policy: "manifest_first"
+  stop_conditions:
+    - active_gate
+    - blocking_issue
+    - paused_completed_or_aborted
+  user_design_gates_waived: []
 
 paper_profile:
   route: null                  # 毕业论文 / 工科学术论文 / 计算机会议论文
@@ -149,7 +161,7 @@ blocking_issues: []
 next_action: "complete initial intake"
 ```
 
-After every task finishes, update `manifest.yaml` before closing the agent/task. Each update must record the completed task, output artifact path, blocking issues, and next executable task. Keep detailed execution traces in `logs/`; do not let `manifest.yaml` grow into a full transcript.
+After every task finishes, update `manifest.yaml` before closing the agent/task. Each update must record the completed task, output artifact path, blocking issues, and next executable task. Use `scripts/next_action.js` before deciding whether to ask the user, continue, or dispatch subagents. Keep detailed execution traces in `logs/`; do not let `manifest.yaml` grow into a full transcript.
 
 Detailed schemas:
 
@@ -193,12 +205,44 @@ When strict multi-agent launch is activated:
 5. The orchestrator must keep stage state, required inputs, produced artifacts, and blocking gates explicit at every transition.
 6. If the current environment truly cannot spawn subagents, the orchestrator must state that limitation and run the same `workflow.yaml` sequentially while preserving every task card, blocking gate, verification rule, artifact boundary, and manifest update.
 7. "Fully automatic" never means skipping hard gates, integrity checks, route declaration, the verified-corpus boundary, or the `开始写作` command. It means the orchestrator proactively advances through non-blocking work after required gates are satisfied.
+8. The orchestrator must persist strict launch intent in `manifest.yaml -> execution_control` with `execution_mode: strict_multi_agent` and `auto_continue: true`. Conversation memory alone is not sufficient authorization.
+9. On every resume/status turn, run `scripts/next_action.js <run_dir>` first. If it reports no active gate, no blocking issue, and one or more runnable tasks, dispatch them immediately instead of asking for confirmation.
 
 The orchestrator should call:
 
 ```bash
 node ~/.codex/skills/academic-research-workflow/scripts/init_run.js --workspace <current-paper-dir> --topic <readable-slug> --mode strict_multi_agent
 ```
+
+### Manifest-First Auto-Continue Rule
+
+`manifest.yaml` is the canonical state. `workflow.yaml` and `agent_tasks/*.yaml` define the graph, but their local `status: pending` values must not override `manifest.yaml.completed_tasks`, `manifest.yaml.stage_status`, `manifest.yaml.active_gates`, or `manifest.yaml.next_action`.
+
+At the start of any turn that mentions this workflow, including "status", "continue", "为什么停下", or any unrelated follow-up while the pipeline is still running, the orchestrator must:
+
+```bash
+node ~/.codex/skills/academic-research-workflow/scripts/validate_manifest.js <run_dir>/manifest.yaml
+node ~/.codex/skills/academic-research-workflow/scripts/validate_workflow.js <run_dir>/workflow.yaml
+node ~/.codex/skills/academic-research-workflow/scripts/next_action.js <run_dir>
+```
+
+If `next_action.js` returns runnable tasks and `auto_continue: true`, the orchestrator must dispatch those tasks. A progress dashboard is informational only; it is not an implicit review gate.
+
+Stop only when one of these is true:
+
+- `active_gates` contains an unresolved gate.
+- `blocking_issues` is non-empty.
+- `status` is `paused`, `completed`, or `aborted`.
+- The user explicitly asks to pause or stop.
+
+### Gate Persistence Rule
+
+Design gates and blocking gates must be separated:
+
+- Design gates: `ROUTE_GATE`, `TOPIC_CLAIM_GATE`, `FRAMEWORK_GATE`, and `START_WRITING_GATE`. These can be resolved by explicit user instructions already present in the run log and should then be recorded in `execution_control.user_design_gates_waived` or the relevant stage log.
+- Blocking gates: `INTEGRITY_GATE` and `REVIEWER_FEASIBILITY_GATE`. These are never skipped by "fully automatic" mode. They trigger only after an actual verification/review failure, not before running the verification/review stage.
+
+When the user has already authorized continuing without review gates, do not reinterpret a later progress boundary as a new design gate. Continue until a blocking gate appears.
 
 ### Codex Native Multi-Agent Invocation Rule
 
@@ -807,8 +851,8 @@ Stage 5: my-academic-paper (format-convert mode)
 
 | Item | Content |
 |------|---------|
-| Skill Version | 3.6.4 |
-| Last Updated | 2026-04-25 |
+| Skill Version | 3.6.5 |
+| Last Updated | 2026-05-29 |
 | Maintainer | Cheng-I Wu |
 | Dependent Skills | deep-research v2.0+, my-academic-paper v1.0+, academic-paper-reviewer v1.1+ |
 | Role | Full academic research workflow orchestrator |

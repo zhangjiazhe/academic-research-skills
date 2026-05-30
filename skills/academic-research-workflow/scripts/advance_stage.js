@@ -10,7 +10,9 @@ function main() {
     status: args.status,
     currentStage: args.stage,
     nextAction: args.next,
+    runTask: args["run-task"],
     completeTask: args["complete-task"],
+    completeStage: args["complete-stage"],
     blockGate: args["block-gate"],
   });
   console.log(JSON.stringify({ ok: true, ...result }, null, 2));

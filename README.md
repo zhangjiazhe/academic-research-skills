@@ -166,6 +166,7 @@ scripts/
 ├── validate_manifest.js
 ├── validate_workflow.js
 ├── validate_task_card.js
+├── next_action.js
 ├── advance_stage.js
 └── lib/workflow_runtime.js
 ```
@@ -276,6 +277,7 @@ workflow 只在关键 gate 停下：
 - 加入 `workflow_proposal.yaml`
 - 引入“模型规划 → 用户审阅 → JS 编译冻结”的任务图流程
 - 新增 JS runtime
+- 新增 manifest-first auto-continue：用 `next_action.js` 从 `manifest.yaml` + `workflow.yaml` 解析下一批可执行任务，避免状态漂移和误把进度展示当作审核 gate
 - 新增 proposal authoring guide
 - 新增 proposal review checklist
 - 强化多 agent 调度规则
@@ -413,6 +415,7 @@ scripts/compile_task_graph.js
 scripts/validate_manifest.js
 scripts/validate_workflow.js
 scripts/validate_task_card.js
+scripts/next_action.js
 scripts/advance_stage.js
 scripts/lib/workflow_runtime.js
 ```
@@ -438,6 +441,7 @@ References must pass the Verified Source Corpus boundary:
 - Added manifest-driven workflow state
 - Added proposal-driven task graph planning
 - Added JS runtime for validation and compilation
+- Added manifest-first auto-continue with `next_action.js` so resume/status turns resolve runnable tasks from canonical state instead of stale task-card statuses
 - Added standardized task cards
 - Added hard gates
 - Added strict multi-agent invocation rules

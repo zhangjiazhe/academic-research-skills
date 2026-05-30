@@ -4,6 +4,8 @@
 
 Use `scripts/init_run.js` to create the initial file, `scripts/build_workflow.js` to rebuild the default graph, and `scripts/validate_workflow.js` before dispatch.
 
+Use `scripts/next_action.js` to resolve dispatch from `manifest.yaml` plus this graph. `manifest.yaml` is canonical for progress; this file is canonical for dependencies and task-card locations.
+
 ## Required Shape
 
 ```yaml
@@ -40,6 +42,7 @@ stages:
 
 - A stage cannot start until all `depends_on` stages are `completed`.
 - A task cannot start until all task-level dependencies are `completed`.
+- Completion is read from `manifest.yaml.completed_tasks` and `manifest.yaml.stage_status` first; task-card `status` values are advisory and may be stale after resume.
 - A task marked `can_run_parallel: true` must be spawned as a Codex subagent when native subagents are available and strict multi-agent launch is active.
 - If native subagents are unavailable, execute the same tasks sequentially and set `execution_mode: sequential_fallback`.
 

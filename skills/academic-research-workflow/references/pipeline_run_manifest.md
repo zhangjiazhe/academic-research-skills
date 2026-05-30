@@ -9,11 +9,22 @@ The manifest is not a transcript. Store detailed agent output, errors, and valid
 ```yaml
 pipeline_run_id: "2026-05-27_readable-topic-slug"
 workflow_name: "academic-research-workflow"
-workflow_version: "3.6.4"
+workflow_version: "3.6.5"
 status: "initializing"   # initializing/planning/running/awaiting_gate_resolution/paused/completed/aborted
 current_stage: "stage_0_intake"
 created_at: "2026-05-27T00:00:00+08:00"
 updated_at: "2026-05-27T00:00:00+08:00"
+
+execution_control:
+  execution_mode: "strict_multi_agent"  # planning/strict_multi_agent/sequential_fallback
+  auto_continue: true
+  canonical_state_file: "manifest.yaml"
+  resume_policy: "manifest_first"
+  stop_conditions:
+    - active_gate
+    - blocking_issue
+    - paused_completed_or_aborted
+  user_design_gates_waived: []
 
 paper_profile:
   route: null            # 毕业论文 / 工科学术论文 / 计算机会议论文
@@ -81,6 +92,7 @@ next_action: "complete initial intake"
 ## Update Rules
 
 Use `scripts/advance_stage.js` for mechanical updates when possible.
+Use `scripts/next_action.js` at every resume/status boundary to determine the next runnable task(s) from manifest-first state.
 
 After every task:
 
@@ -104,3 +116,9 @@ active_gates:
 ```
 
 Only DESIGN_GATE and BLOCKING_GATE entries stop execution.
+
+## Resume And Auto-Continue Rules
+
+`manifest.yaml` is authoritative when it conflicts with `workflow.yaml` or task-card `status` fields. In particular, `completed_tasks` and `stage_status` override stale `status: pending` values in task cards.
+
+If `execution_control.auto_continue` is `true`, the orchestrator must continue to the runnable task(s) returned by `scripts/next_action.js` unless one of the recorded `stop_conditions` is present.

@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const WORKFLOW_NAME = "academic-research-workflow";
-const WORKFLOW_VERSION = "3.6.4";
+const WORKFLOW_VERSION = "3.6.5";
 
 const VALID_ROUTES = new Set(["毕业论文", "工科学术论文", "计算机会议论文"]);
 const VALID_PIPELINE_STATUSES = new Set([
@@ -15,6 +15,7 @@ const VALID_PIPELINE_STATUSES = new Set([
   "aborted",
 ]);
 const VALID_TASK_STATUSES = new Set(["pending", "running", "completed", "blocked", "failed"]);
+const VALID_EXECUTION_MODES = new Set(["planning", "strict_multi_agent", "sequential_fallback"]);
 const VALID_GATES = new Set([
   "ROUTE_GATE",
   "TOPIC_CLAIM_GATE",
@@ -305,9 +306,18 @@ function relativeToRun(runDir, target) {
   return path.relative(runDir, target).replace(/\\/g, "/") || ".";
 }
 
-function buildManifest({ runId, route = null, hasData = null, data = [], code = [], experiments = [] }) {
+function buildManifest({
+  runId,
+  route = null,
+  executionMode = "planning",
+  hasData = null,
+  data = [],
+  code = [],
+  experiments = [],
+}) {
   const ts = nowIso();
   const routeValue = route && VALID_ROUTES.has(route) ? route : null;
+  const mode = VALID_EXECUTION_MODES.has(executionMode) ? executionMode : "planning";
   const activeGates = routeValue
     ? []
     : [
@@ -329,6 +339,14 @@ function buildManifest({ runId, route = null, hasData = null, data = [], code = 
     current_stage: "stage_0_intake",
     created_at: ts,
     updated_at: ts,
+    execution_control: {
+      execution_mode: mode,
+      auto_continue: mode === "strict_multi_agent",
+      canonical_state_file: "manifest.yaml",
+      resume_policy: "manifest_first",
+      stop_conditions: ["active_gate", "blocking_issue", "paused_completed_or_aborted"],
+      user_design_gates_waived: [],
+    },
     paper_profile: {
       route: routeValue,
       target_standard: "highest_feasible",
@@ -494,7 +512,7 @@ function createRun({ workspace, topic, route, executionMode, hasData, data, code
   ensureDir(path.join(runDir, "artifacts"));
   ensureDir(path.join(runDir, "logs"));
 
-  const manifest = buildManifest({ runId, route, hasData, data, code, experiments });
+  const manifest = buildManifest({ runId, route, executionMode, hasData, data, code, experiments });
   const workflow = buildWorkflow({ runId, executionMode });
   const tasks = seedTaskCards();
 
@@ -573,7 +591,7 @@ function validateWorkflow(file) {
   const workflowName = getScalar(text, "workflow_name");
   if (workflowName && workflowName !== WORKFLOW_NAME) errors.push(`workflow_name must be ${WORKFLOW_NAME}`);
   const mode = getScalar(text, "execution_mode");
-  if (mode && !["planning", "strict_multi_agent", "sequential_fallback"].includes(mode)) {
+  if (mode && !VALID_EXECUTION_MODES.has(mode)) {
     errors.push(`invalid execution_mode: ${mode}`);
   }
   if (!/stage_id\s*:/.test(text)) errors.push("workflow must contain at least one stage_id");
@@ -585,7 +603,7 @@ function validateWorkflowProposalObject(proposal) {
   if (!proposal || typeof proposal !== "object") return ["proposal must be an object"];
   if (proposal.workflow_name !== WORKFLOW_NAME) errors.push(`workflow_name must be ${WORKFLOW_NAME}`);
   if (!proposal.proposal_id) errors.push("missing proposal_id");
-  if (!["planning", "strict_multi_agent", "sequential_fallback"].includes(proposal.execution_mode)) {
+  if (!VALID_EXECUTION_MODES.has(proposal.execution_mode)) {
     errors.push("execution_mode must be planning, strict_multi_agent, or sequential_fallback");
   }
   if (!Array.isArray(proposal.stages) || proposal.stages.length === 0) {
@@ -726,6 +744,11 @@ function compileTaskGraph({ proposalPath, runDir }) {
   for (const task of taskCards) {
     fs.writeFileSync(path.join(targetRunDir, "agent_tasks", `${task.task_id}.yaml`), `${toYaml(task)}\n`, "utf8");
   }
+  const manifestPath = path.join(targetRunDir, "manifest.yaml");
+  if (fs.existsSync(manifestPath)) {
+    const manifestText = readText(manifestPath);
+    fs.writeFileSync(manifestPath, upsertExecutionControl(manifestText, proposal.execution_mode), "utf8");
+  }
   appendLog(targetRunDir, `compiled task graph from ${proposalPath}`);
   return { ok: true, workflowPath, taskCount: taskCards.length };
 }
@@ -740,10 +763,26 @@ function updateManifestText(text, updates) {
   if (updates.status) out = replaceScalar(out, "status", updates.status);
   if (updates.currentStage) out = replaceScalar(out, "current_stage", updates.currentStage);
   if (updates.nextAction) out = replaceScalar(out, "next_action", updates.nextAction);
+  if (updates.runTask) out = addTopLevelListItem(out, "running_tasks", updates.runTask);
   if (updates.completeTask) out = addTopLevelListItem(out, "completed_tasks", updates.completeTask);
+  if (updates.completeTask) out = removeTopLevelListItem(out, "running_tasks", updates.completeTask);
+  if (updates.completeStage) out = setStageStatus(out, updates.completeStage, "completed");
   if (updates.blockTask) out = addTopLevelListItem(out, "blocked_tasks", updates.blockTask);
+  if (updates.blockTask) out = removeTopLevelListItem(out, "running_tasks", updates.blockTask);
   if (updates.blockGate) out = addGate(out, updates.blockGate);
   out = replaceScalar(out, "updated_at", nowIso());
+  return out;
+}
+
+function upsertExecutionControl(text, executionMode) {
+  const mode = VALID_EXECUTION_MODES.has(executionMode) ? executionMode : "planning";
+  const autoContinue = mode === "strict_multi_agent";
+  if (!hasKey(text, "execution_control")) {
+    const block = `execution_control:\n  execution_mode: ${yamlScalar(mode)}\n  auto_continue: ${yamlScalar(autoContinue)}\n  canonical_state_file: manifest.yaml\n  resume_policy: manifest_first\n  stop_conditions:\n    - active_gate\n    - blocking_issue\n    - paused_completed_or_aborted\n  user_design_gates_waived: []\n`;
+    return text.replace(/(^updated_at\s*:[^\n]*\n)/m, `$1${block}`);
+  }
+  let out = replaceNestedScalar(text, "execution_control", "execution_mode", mode);
+  out = replaceNestedScalar(out, "execution_control", "auto_continue", autoContinue);
   return out;
 }
 
@@ -766,6 +805,40 @@ function addTopLevelListItem(text, key, value) {
   return `${text.slice(0, insertAt).replace(/\n?$/, "\n")}  - ${yamlScalar(value)}\n${text.slice(insertAt)}`;
 }
 
+function removeTopLevelListItem(text, key, value) {
+  if (!value) return text;
+  const blockRe = new RegExp(`(^|\\n)${escapeRegExp(key)}\\s*:\\n((?:  - [^\\n]*\\n?)*)`, "m");
+  const match = text.match(blockRe);
+  if (!match) return text;
+  const lines = match[2]
+    .split("\n")
+    .filter((line) => line.trim() && line.trim() !== `- ${value}` && line.trim() !== `- ${yamlScalar(value)}`);
+  const replacement = lines.length ? `${key}:\n${lines.join("\n")}\n` : `${key}: []\n`;
+  return `${text.slice(0, match.index + (match[1] ? 1 : 0))}${replacement}${text.slice(match.index + match[0].length)}`;
+}
+
+function setStageStatus(text, stageId, status) {
+  if (!stageId) return text;
+  const re = new RegExp(`(^\\s{2}${escapeRegExp(stageId)}\\s*:\\s*)([^\\n]*)`, "m");
+  if (re.test(text)) return text.replace(re, `$1${yamlScalar(status)}`);
+  return text;
+}
+
+function replaceNestedScalar(text, parentKey, childKey, value) {
+  const parentRe = new RegExp(`(^|\\n)${escapeRegExp(parentKey)}\\s*:\\n`, "m");
+  const parentMatch = text.match(parentRe);
+  if (!parentMatch) return text;
+  const start = parentMatch.index + parentMatch[0].length;
+  const nextTop = text.slice(start).search(/\n\S/);
+  const end = nextTop === -1 ? text.length : start + nextTop + 1;
+  const block = text.slice(start, end);
+  const childRe = new RegExp(`(^\\s{2}${escapeRegExp(childKey)}\\s*:\\s*)([^\\n]*)`, "m");
+  if (childRe.test(block)) {
+    return `${text.slice(0, start)}${block.replace(childRe, `$1${yamlScalar(value)}`)}${text.slice(end)}`;
+  }
+  return `${text.slice(0, end).replace(/\n?$/, "\n")}  ${childKey}: ${yamlScalar(value)}\n${text.slice(end)}`;
+}
+
 function addGate(text, gateType) {
   if (!gateType) return text;
   const gate = {
@@ -783,7 +856,7 @@ function addGate(text, gateType) {
   return text;
 }
 
-function advanceRun({ runDir, status, currentStage, nextAction, completeTask, blockGate }) {
+function advanceRun({ runDir, status, currentStage, nextAction, completeTask, completeStage, runTask, blockGate }) {
   const manifestPath = path.join(runDir, "manifest.yaml");
   if (!fs.existsSync(manifestPath)) throw new Error(`manifest.yaml not found in ${runDir}`);
   let text = readText(manifestPath);
@@ -793,21 +866,167 @@ function advanceRun({ runDir, status, currentStage, nextAction, completeTask, bl
     currentStage,
     nextAction: blockGate ? `resolve ${blockGate}` : nextAction,
     completeTask,
+    completeStage,
+    runTask,
     blockTask: blockGate ? completeTask : null,
     blockGate,
   });
   fs.writeFileSync(manifestPath, text, "utf8");
+  if (runTask) appendLog(runDir, `running task: ${runTask}`);
   if (completeTask) appendLog(runDir, `completed task: ${completeTask}`);
+  if (completeStage) appendLog(runDir, `completed stage: ${completeStage}`);
   if (blockGate) appendLog(runDir, `blocked by gate: ${blockGate}`);
   return { manifestPath };
+}
+
+function idsFromList(value) {
+  return new Set(asArray(value).filter(Boolean).map(String));
+}
+
+function isActiveGateList(value) {
+  return asArray(value).some((gate) => {
+    if (!gate) return false;
+    if (typeof gate === "string") return gate.length > 0;
+    return gate.status !== "resolved" && gate.status !== "waived";
+  });
+}
+
+function readTaskCard(runDir, taskPath) {
+  const file = path.join(runDir, taskPath);
+  const task = readYamlOrJson(file);
+  task.task_card = taskPath;
+  return task;
+}
+
+function resolveNextAction({ runDir }) {
+  const manifestPath = path.join(runDir, "manifest.yaml");
+  const workflowPath = path.join(runDir, "workflow.yaml");
+  if (!fs.existsSync(manifestPath)) throw new Error(`manifest.yaml not found in ${runDir}`);
+  if (!fs.existsSync(workflowPath)) throw new Error(`workflow.yaml not found in ${runDir}`);
+  const manifest = readYamlOrJson(manifestPath);
+  const workflow = readYamlOrJson(workflowPath);
+  const executionMode =
+    manifest.execution_control?.execution_mode || workflow.execution_mode || "planning";
+  const autoContinue =
+    manifest.execution_control?.auto_continue !== undefined
+      ? Boolean(manifest.execution_control.auto_continue)
+      : executionMode === "strict_multi_agent";
+  const completed = idsFromList(manifest.completed_tasks);
+  const blockedTasks = idsFromList(manifest.blocked_tasks);
+  const stageStatus = manifest.stage_status || {};
+  const isComplete = (id) => completed.has(id) || stageStatus[id] === "completed";
+  const activeGates = asArray(manifest.active_gates);
+  const blockingIssues = asArray(manifest.blocking_issues);
+  const terminalStatuses = new Set(["paused", "completed", "aborted"]);
+
+  if (terminalStatuses.has(manifest.status)) {
+    return {
+      ok: true,
+      blocked: true,
+      reason: `pipeline status is ${manifest.status}`,
+      canonical_state: "manifest.yaml",
+      execution_mode: executionMode,
+      auto_continue: autoContinue,
+      current_stage: manifest.current_stage,
+      next_action: manifest.next_action,
+      runnable_tasks: [],
+    };
+  }
+  if (isActiveGateList(activeGates)) {
+    return {
+      ok: true,
+      blocked: true,
+      reason: "active_gate",
+      active_gates: activeGates,
+      canonical_state: "manifest.yaml",
+      execution_mode: executionMode,
+      auto_continue: autoContinue,
+      current_stage: manifest.current_stage,
+      next_action: manifest.next_action,
+      runnable_tasks: [],
+    };
+  }
+  if (blockingIssues.length > 0) {
+    return {
+      ok: true,
+      blocked: true,
+      reason: "blocking_issue",
+      blocking_issues: blockingIssues,
+      canonical_state: "manifest.yaml",
+      execution_mode: executionMode,
+      auto_continue: autoContinue,
+      current_stage: manifest.current_stage,
+      next_action: manifest.next_action,
+      runnable_tasks: [],
+    };
+  }
+
+  const stages = asArray(workflow.stages);
+  let stage = stages.find((item) => item.stage_id === manifest.current_stage);
+  if (!stage || isComplete(stage.stage_id)) {
+    stage = stages.find(
+      (item) => !isComplete(item.stage_id) && asArray(item.depends_on).every((dep) => isComplete(dep)),
+    );
+  }
+  if (!stage) {
+    return {
+      ok: true,
+      blocked: false,
+      reason: null,
+      canonical_state: "manifest.yaml",
+      execution_mode: executionMode,
+      auto_continue: autoContinue,
+      current_stage: manifest.current_stage,
+      next_action: "no runnable stage found",
+      runnable_tasks: [],
+    };
+  }
+
+  const tasks = asArray(stage.tasks).map((taskPath) => readTaskCard(runDir, taskPath));
+  const runnable = tasks.filter((task) => {
+    if (completed.has(task.task_id) || blockedTasks.has(task.task_id)) return false;
+    return asArray(task.depends_on).every((dep) => isComplete(dep));
+  });
+  const parallelRunnable = runnable.filter((task) => task.can_run_parallel);
+  const selected =
+    executionMode === "strict_multi_agent" && parallelRunnable.length > 1 ? parallelRunnable : runnable.slice(0, 1);
+
+  return {
+    ok: true,
+    blocked: false,
+    reason: null,
+    canonical_state: "manifest.yaml",
+    execution_mode: executionMode,
+    auto_continue: autoContinue,
+    current_stage: stage.stage_id,
+    next_action: selected.length
+      ? `dispatch ${selected.map((task) => task.task_id).join(", ")}`
+      : `complete or inspect ${stage.stage_id}`,
+    dispatch_mode:
+      executionMode === "strict_multi_agent" && selected.length > 1 ? "parallel_subagents" : "single_or_sequential",
+    runnable_tasks: selected.map((task) => ({
+      task_id: task.task_id,
+      stage_id: task.stage_id,
+      task_card: task.task_card,
+      agent_name: task.agent_name,
+      called_skill: task.called_skill,
+      can_run_parallel: Boolean(task.can_run_parallel),
+      input_artifacts: asArray(task.input_artifacts),
+      output_artifacts: asArray(task.output_artifacts),
+      log_file: task.log_file,
+    })),
+  };
 }
 
 module.exports = {
   WORKFLOW_NAME,
   VALID_ROUTES,
+  VALID_EXECUTION_MODES,
   asArray,
   createRun,
   parseArgs,
+  readYamlOrJson,
+  resolveNextAction,
   validateManifest,
   validateTaskCard,
   validateWorkflow,
