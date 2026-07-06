@@ -6,6 +6,12 @@ Original upstream repository: [Imbad0202/academic-research-skills](https://githu
 
 This repository stores a customized Codex academic research and writing workflow under `skills/`.
 
+## License / 许可
+
+This customized repository is distributed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0), preserving the upstream non-commercial licensing boundary. See [`LICENSE`](LICENSE) and [`NOTICE.md`](NOTICE.md).
+
+本定制仓库沿用上游的 Creative Commons Attribution-NonCommercial 4.0 International License（CC BY-NC 4.0）许可，保留非商业使用限制。详情见 [`LICENSE`](LICENSE) 和 [`NOTICE.md`](NOTICE.md)。
+
 ## 中文说明
 
 ### 仓库说明

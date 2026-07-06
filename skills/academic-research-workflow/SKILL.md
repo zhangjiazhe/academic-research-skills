@@ -1,6 +1,6 @@
 ---
 name: academic-research-workflow
-description: "Customized full academic research pipeline: research -> custom writing -> integrity check -> review -> revise -> re-review -> re-revise -> final integrity check -> finalize. Coordinates deep-research, my-academic-paper, and academic-paper-reviewer so the original workflow is preserved while the writing stages use the user's thesis/engineering/conference routing rules."
+description: "Customized full academic research pipeline from research to custom writing, integrity check, review, revise, re-review, re-revise, final integrity check, and finalize. Coordinates deep-research, my-academic-paper, and academic-paper-reviewer so the original workflow is preserved while the writing stages use the user's thesis/engineering/conference routing rules."
 metadata:
   version: "3.6.5"
   last_updated: "2026-05-29"
